@@ -1,0 +1,294 @@
+import pygame
+import sys
+from abc import ABC, abstractmethod
+
+# Inisialisasi Pygame
+pygame.init()
+
+# Dimensi layar
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Brick Breaker")
+
+
+# Load background image
+background_image = pygame.image.load(r"f:\image.pbo\Texture of the Floor Covering.jpg")  # Ganti "background.jpg" dengan nama file gambar Anda
+background_image = pygame.transform.scale(background_image, (WIDTH, HEIGHT))  # Sesuaikan ukuran gambar dengan layar
+background_image1 = pygame.image.load(r"f:\image.pbo\Cave Game Background Illustration Design2.jpg")  # Ganti "background.jpg" dengan nama file gambar Anda
+background_image1 = pygame.transform.scale(background_image1, (WIDTH, HEIGHT))  # Sesuaikan ukuran gambar dengan layar
+
+# Warna
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+GREEN = (0, 255, 0)
+GRAY = (200, 200, 200)
+YELLOW = (255, 255, 0)
+
+# Variabel game
+clock = pygame.time.Clock()
+FPS = 60
+font = pygame.font.Font(None, 36)
+
+current_level = 1
+score = 0
+level_targets = [50, 100, 150, 200, 250, 300, 400, 500]
+
+
+# Kelas abstrak GameObject
+class GameObject(ABC):
+    @abstractmethod
+    def draw(self, surface):
+        pass
+
+    @abstractmethod
+    def update(self):
+        pass
+
+# Kelas Ball
+class Ball(GameObject):
+    def __init__(self, x, y, radius, speed_x, speed_y, image_path):
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.speed_x = speed_x
+        self.speed_y = speed_y
+        self.image = pygame.image.load(r"f:\image.pbo\ball.png")  # Muat gambar bola
+        self.image = pygame.transform.scale(self.image, (radius * 2, radius * 2))  # Skala gambar agar sesuai dengan radius bola
+
+    def draw(self, surface):
+        # Gambar bola dengan gambar yang telah dimuat
+        surface.blit(self.image, (self.x - self.radius, self.y - self.radius))  # Tempatkan gambar bola di posisi yang tepat
+
+    def update(self):
+        self.x += self.speed_x
+        self.y += self.speed_y
+
+        # Bounce pada dinding
+        if self.x - self.radius <= 0 or self.x + self.radius >= WIDTH:
+            self.speed_x = -self.speed_x
+        if self.y - self.radius <= 0:
+            self.speed_y = -self.speed_y
+
+    def check_collision(self, rect):
+        ball_rect = pygame.Rect(self.x - self.radius, self.y - self.radius, self.radius * 2, self.radius * 2)
+        return ball_rect.colliderect(rect)
+
+    def bounce(self):
+        self.speed_y = -self.speed_y
+
+    def is_out_of_bounds(self):
+        return self.y - self.radius >= HEIGHT
+
+
+
+# Kelas Paddle
+class Paddle(GameObject):
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)  # Ukuran paddle
+        self.speed = 10
+        self.image = pygame.image.load(r"f:\image.pbo\paddle.image.png")  # Path gambar paddle
+        self.image = pygame.transform.scale(self.image, (width, height))  # Skalakan gambar sesuai ukuran paddle
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)  # Tampilkan gambar paddle di layar
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and self.rect.left > 0:
+            self.rect.x -= self.speed
+        if keys[pygame.K_RIGHT] and self.rect.right < WIDTH:
+            self.rect.x += self.speed
+
+# Kelas Block
+class Block(GameObject):
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.image = pygame.image.load(r"f:\image.pbo\download (1).jpg")  # Muat gambar
+        self.image = pygame.transform.scale(self.image, (width, height)) 
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)  # Tampilkan gambar di layar
+
+    def update(self):
+        pass
+
+
+# Fungsi untuk membuat blok
+def create_blocks(level):
+    rows = min(5, level + 2)
+    columns = 10
+    block_width = WIDTH // columns
+    block_height = 30
+    return [
+        Block(col * block_width, row * block_height, block_width, block_height)
+        for row in range(rows) for col in range(columns)
+    ]
+
+
+# Fungsi untuk menampilkan layar Level Complete
+def level_complete():
+    while True:
+        screen.fill(WHITE)
+
+        complete_text = font.render("Level Complete!", True, GREEN)
+        screen.blit(complete_text, (WIDTH // 2 - complete_text.get_width() // 2, HEIGHT // 3))
+
+        draw_button("Next Level", WIDTH // 2 - 100, HEIGHT // 2, 200, 50, GREEN, next_level)
+        draw_button("Main Menu", WIDTH // 2 - 100, HEIGHT // 2 + 70, 200, 50, GRAY, main_menu)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+# Fungsi untuk melanjutkan ke level berikutnya
+def next_level():
+    global current_level
+    current_level += 1
+    start_game()
+
+
+# Fungsi untuk menampilkan layar Game Over
+def game_over():
+    while True:
+        screen.fill(WHITE)
+
+        game_over_text = font.render("GAME OVER", True, RED)
+        screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 3))
+
+        draw_button("Main Menu", WIDTH // 2 - 100, HEIGHT // 2, 200, 50, GREEN, main_menu)
+        draw_button("Keluar", WIDTH // 2 - 100, HEIGHT // 2 + 70, 200, 50, GRAY, sys.exit)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+# Fungsi game utama
+# Fungsi game utama
+def start_game():
+    global score
+    score = 0
+    # Membuat objek paddle dengan lebar lebih besar
+    paddle = Paddle(WIDTH // 2 - 100, HEIGHT - 40, 200, 20)  # Paddle lebih lebar
+    ball = Ball(WIDTH // 2, HEIGHT // 2, 18, 4 + current_level, -4 - current_level, r"f:\image.pbo\ball.png")
+    blocks = create_blocks(current_level)
+    target_score = level_targets[current_level - 1]
+
+    while True:
+        screen.fill(WHITE)
+        screen.blit(background_image, (0, 0))
+        # Event handling
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        # Update objek game
+        paddle.update()
+        ball.update()
+
+        # Pantulan pada paddle
+        if ball.check_collision(paddle.rect):
+            ball.bounce()
+
+        # Pantulan pada blok
+        for block in blocks:
+            if ball.check_collision(block.rect):
+                blocks.remove(block)
+                ball.bounce()
+                score += 10
+                break
+
+        # Jika bola keluar dari layar
+        if ball.is_out_of_bounds():
+            game_over()
+            return
+
+        # Gambar objek game
+        paddle.draw(screen)
+        ball.draw(screen)
+        for block in blocks:
+            block.draw(screen)
+
+        # Tampilkan skor dan level
+        score_text = font.render(f"Score: {score}/{target_score}", True, WHITE)
+        screen.blit(score_text, (10, 10))
+
+        level_text = font.render(f"Level: {current_level}", True, YELLOW)
+        screen.blit(level_text, (WIDTH - 150, 10))
+
+        # Jika menang
+        if score >= target_score:
+            level_complete()
+            return
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+# Fungsi menu utama
+def main_menu():
+    while True:
+        screen.fill(WHITE)
+        screen.blit(background_image1, (0, 0))
+
+        # Tampilkan gambar judul
+        title_image = pygame.image.load(r"f:\image.pbo\judul fix.png")
+        title_image = pygame.transform.scale(title_image, (400, 600))
+        screen.blit(title_image, (WIDTH // 2 - 200, HEIGHT // 10))
+
+        # Tampilkan gambar tombol
+        button_image = pygame.image.load(r"f:\image.pbo\start.button.png")
+        button_image = pygame.transform.scale(button_image, (400, 600))  # Sesuaikan ukuran gambar tombol
+        button_x = WIDTH // 2 - 220  # Posisi horizontal tombol
+        button_y = HEIGHT // 5   # Posisi vertikal tombol
+        screen.blit(button_image, (button_x, button_y))
+
+        # Area deteksi klik untuk gambar tombol
+        button_rect = pygame.Rect(button_x, button_y, 400, 600)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:  # Klik mouse
+                if button_rect.collidepoint(event.pos):  # Deteksi klik pada tombol
+                    pygame.time.delay(150)  # Delay untuk mencegah double-click
+                    start_game()  # Panggil fungsi untuk memulai game
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+
+# Fungsi untuk membuat tombol
+def draw_button(text, x, y, width, height, color, action=None):
+
+    button_rect = pygame.Rect(x, y, width, height)
+    pygame.draw.rect(screen, color, button_rect)
+    pygame.draw.rect(screen, BLACK, button_rect, 2)
+    text_surface = font.render(text, True, BLACK)
+    screen.blit(text_surface, (x + (width - text_surface.get_width()) // 2, y + (height - text_surface.get_height()) // 2))
+    mouse = pygame.mouse.get_pos()
+    click = pygame.mouse.get_pressed()
+
+    button_rect = pygame.Rect(x, y, width, height)
+    
+    # Deteksi klik pada area tombol
+    if button_rect.collidepoint(mouse) and click[0] == 1 and action:
+        action()
+
+
+
+# Mulai game
+main_menu()
